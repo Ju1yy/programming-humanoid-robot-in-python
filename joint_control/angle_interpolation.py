@@ -32,8 +32,8 @@ class AngleInterpolationAgent(PIDAgent):
                  sync_mode=True):
         super(AngleInterpolationAgent, self).__init__(simspark_ip, simspark_port, teamname, player_id, sync_mode)
         self.keyframes = ([], [], [])
-        self.firstTime = 0 
-        self.lastTime = 0 
+        self.startTime = 0 
+        self.endTime = 0 
 
     def think(self, perception):
         target_joints = self.angle_interpolation(self.keyframes, perception)
@@ -43,53 +43,72 @@ class AngleInterpolationAgent(PIDAgent):
     def angle_interpolation(self, keyframes, perception):
         target_joints = {}
         # YOUR CODE HERE
+
         (names, times, keys) = keyframes
+        self.currentTime = self.perception.time
+        timeInKeyframes = self.currentTime - self.startTime
 
-        timeInKeyframes = self.currentTime - self.firstTime
-        
-        for nameIndex in range(0, len(names)):
-            name = names[nameIndex]
-            timeForName = times[nameIndex]
-            keyForName = keys[nameIndex]
+        if self.maxTimesForNames == 0:
+            for valueIndex in range(0, len(names)):
+                name = names[valueIndex]
+                timesForName = times[valueIndex]
+                keysForName = keys[valueIndex]
+                if timesForName[len(timesForName)-1]> self.maxTimesForNames:
+                   self.maxTimesForNames = timesForName[len(timesForName)-1]
 
-            if not name in self.perception.joint:
-                continue
 
-            
-            if timeInKeyframes < timeForName[0]:
+        if self.maxTimesForNames < timeInKeyframes:
+            self.startTime = self.currentTime
+            timeInKeyframes = self.currentTime - self.startTime
 
-                P0 = (timeInKeyframes, self.perception.joint[name])
-                P1 = (timeForName[0] + keyForName[0][1][1], keyForName[0][0] + keyForName[0][1][2])
-                P2 = (timeForName[0], keyForName[0][0]) #
-                P3 = (timeForName[0] + keyForName[0][1][1], keyForName[0][0] + keyForName[0][1][2])
 
-                t = (timeInKeyframes - self.firstTime) / (timeForName[0] - self.firstTime)
+        for valueIndex in range(0, len(names)):
+            name = names[valueIndex]
+            timesForName = times[valueIndex]
+            keysForName = keys[valueIndex]
 
-            else :
+            if timeInKeyframes < timesForName[0]:
                 
-                if timeInKeyframes >= timeForName[-1]:
+                if not name in self.perception.joint:
+                    continue
+
+                P_0 = (timeInKeyframes, self.perception.joint[name])
+                P_1 = (timesForName[0] + keysForName[0][1][1], keysForName[0][0] + keysForName[0][1][2])
+                P_2 = (timesForName[0], keysForName[0][0]) #
+                P_3 = (timesForName[0] + keysForName[0][1][1], keysForName[0][0] + keysForName[0][1][2])
+
+                t = (timeInKeyframes - self.startTime) / (timesForName[0] - self.startTime)
+
+               
+            else:
+
+                if timeInKeyframes >= timesForName[-1]:
                     continue
 
                 i = 0
-                while timeInKeyframes > timeForName[i]:
+                while timeInKeyframes > timesForName[i]:
                     i += 1
 
                 i = i - 1
+
+                P_0 = (timesForName[i], keysForName[i][0])
+                P_1 = (timesForName[i] + keysForName[i][2][1], keysForName[i][0] + keysForName[i][2][2])
+                P_2 = (timesForName[i+1], keysForName[i+1][0]) #
+                P_3 = (timesForName[i+1] + keysForName[i+1][1][1], keysForName[i+1][0] + keysForName[i+1][1][2]) 
+
+                t = (timeInKeyframes - timesForName[i]) / (timesForName[i+1] - timesForName[i])
                 
-                P0 = (timeForName[i], keyForName[i][0])
-                P1 = (timeForName[i] + keyForName[i][2][1], keyForName[i][0] + keyForName[i][2][2])
-                P2 = (timeForName[i+1], keyForName[i+1][0]) #
-                P3 = (timeForName[i+1] + keyForName[i+1][1][1], keyForName[i+1][0] + keyForName[i+1][1][2]) 
-
-                t = (timeInKeyframes - timeForName[i]) / (timeForName[i+1] - timeForName[i])
-
+                
             if t > 1:
                 t = 1.0
+            elif t < 0:
+                t = 0.0
 
-            target_joints[name] = ((1-t) ** 3) * P0[1] + 3 * ((1-t) ** 2) * t * P1[1] + 3 * (1-t) * (t ** 2) * P2[1] + (t**3) * P3[1]
-                
+            target_joints[name] = ((1-t) ** 3) * P_0[1] + 3 * ((1-t) ** 2) * t * P_1[1] + 3 * (1-t) * (t ** 2) * P_2[1] + (t**3) * P_3[1]
+    
 
         return target_joints
+
 
 if __name__ == '__main__':
     agent = AngleInterpolationAgent()
