@@ -48,16 +48,16 @@ class AngleInterpolationAgent(PIDAgent):
         self.currentTime = self.perception.time
         timeInKeyframes = self.currentTime - self.startTime
 
-        if self.maxTimesForNames == 0:
+        if self.endTime == 0:
             for valueIndex in range(0, len(names)):
                 name = names[valueIndex]
                 timesForName = times[valueIndex]
                 keysForName = keys[valueIndex]
-                if timesForName[len(timesForName)-1]> self.maxTimesForNames:
-                   self.maxTimesForNames = timesForName[len(timesForName)-1]
+                if timesForName[len(timesForName)-1]> self.endTime:
+                   self.endTime = timesForName[len(timesForName)-1]
 
 
-        if self.maxTimesForNames < timeInKeyframes:
+        if self.endTime < timeInKeyframes or self.startTime == 0:
             self.startTime = self.currentTime
             timeInKeyframes = self.currentTime - self.startTime
 
