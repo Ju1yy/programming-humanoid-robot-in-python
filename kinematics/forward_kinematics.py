@@ -93,9 +93,9 @@ class ForwardKinematicsAgent(AngleInterpolationAgent):
                     [0, 0, 0, 1]
                     ])
         
-        T[0,3] = self.jointLengths[joint_name][0]
-        T[1,3] = self.jointLengths[joint_name][1]
-        T[2,3] = self.jointLengths[joint_name][2]
+        T[0,3] = self.lengthsOfChains[joint_name][0]
+        T[1,3] = self.lengthsOfChains[joint_name][1]
+        T[2,3] = self.lengthsOfChains[joint_name][2]
 
         return T
 
@@ -109,7 +109,7 @@ class ForwardKinematicsAgent(AngleInterpolationAgent):
             T = identity(4)
             for joint in chain_joints:
                 angle = joints[joint]
-                Tl = local_trans(joint, angle)
+                Tl = self.local_trans(joint, angle)
                 # YOUR CODE HERE
                 T = T * Tl 
 
