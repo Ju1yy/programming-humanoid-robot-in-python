@@ -105,15 +105,14 @@ class ForwardKinematicsAgent(AngleInterpolationAgent):
 
         :param joints: {joint_name: joint_angle}
         '''
-        for chain_joints in self.chains.values():
-            T = identity(4)
-            for joint in chain_joints:
-                angle = joints[joint]
-                Tl = self.local_trans(joint, angle)
-                # YOUR CODE HERE
-                T = T * Tl 
+        T = identity(4)
+        for joint in joints.keys():
+            angle = joints[joint]
+            Tl = self.local_trans(joint, angle)
+            # YOUR CODE HERE
+            T = T * Tl 
+            self.transforms[joint] = T
 
-                self.transforms[joint] = T
 
 if __name__ == '__main__':
     agent = ForwardKinematicsAgent()

@@ -22,6 +22,7 @@
 
 from pid import PIDAgent
 from keyframes import hello
+from keyframes import leftBellyToStand
 
 
 class AngleInterpolationAgent(PIDAgent):
@@ -32,7 +33,7 @@ class AngleInterpolationAgent(PIDAgent):
                  sync_mode=True):
         super(AngleInterpolationAgent, self).__init__(simspark_ip, simspark_port, teamname, player_id, sync_mode)
         self.keyframes = ([], [], [])
-        self.startTime = 0 
+        self.startTime = -1 
         self.endTime = 0 
 
     def think(self, perception):
@@ -43,71 +44,79 @@ class AngleInterpolationAgent(PIDAgent):
     def angle_interpolation(self, keyframes, perception):
         target_joints = {}
         # YOUR CODE HERE
-
+        
+        if(self.keyframes == ([],[],[])):
+            return target_joints
+        
+        # calculate time
+        if(self.startTime == -1):
+            self.startTime = perception.time
+        timeDiff = perception.time - self.startTime
+        
         (names, times, keys) = keyframes
-        self.currentTime = self.perception.time
-        timeInKeyframes = self.currentTime - self.startTime
-
-        if self.endTime == 0:
-            for valueIndex in range(0, len(names)):
-                name = names[valueIndex]
-                timesForName = times[valueIndex]
-                keysForName = keys[valueIndex]
-                if timesForName[len(timesForName)-1]> self.endTime:
-                   self.endTime = timesForName[len(timesForName)-1]
-
-
-        if self.endTime < timeInKeyframes or self.startTime == 0:
-            self.startTime = self.currentTime
-            timeInKeyframes = self.currentTime - self.startTime
-
-
-        for valueIndex in range(0, len(names)):
-            name = names[valueIndex]
-            timesForName = times[valueIndex]
-            keysForName = keys[valueIndex]
-
-            if timeInKeyframes < timesForName[0]:
+        
+        skippedJoints = 0
+        for (i, name) in enumerate(names):
+            
+            timeLow = 0     # represents the lower threshold of the keyframe
+            timeHigh = 0    # represents the upper threshold of the keyframe
+            num = 0       # the upper index of the keyframe which has to be used for interpolation
+            jointTimes = times[i]    # just for easier reading/writing
+            lenJointTimes = len(jointTimes)
+            
+            # interpolation is finished for this joint, dont do any more steps
+            if (timeDiff > jointTimes[-1]):
+                skippedJoints += 1
+                # if we skipped all joints interpolation is done -> reset timer and keyframes
+                if(skippedJoints == len(names)):
+                    self.startTime = -1
+                    self.keyframes = ([],[],[])
+                continue
+            
+            
+            
+            
+            # iterate over all times of the current joint to find the right time span
+            for j in xrange(lenJointTimes):
+                timeHigh = jointTimes[j]
                 
-                if not name in self.perception.joint:
-                    continue
-
-                P_0 = (timeInKeyframes, self.perception.joint[name])
-                P_1 = (timesForName[0] + keysForName[0][1][1], keysForName[0][0] + keysForName[0][1][2])
-                P_2 = (timesForName[0], keysForName[0][0]) #
-                P_3 = (timesForName[0] + keysForName[0][1][1], keysForName[0][0] + keysForName[0][1][2])
-
-                t = (timeInKeyframes - self.startTime) / (timesForName[0] - self.startTime)
-
-               
+                # we found the right interval -> break
+                if ((timeDiff >= timeLow and timeDiff < timeHigh)): 
+                    num = j
+                    break
+                timeLow = timeHigh
+            
+            # calculate t-value
+            if((timeHigh - timeLow) == 0.): 
+                t=1.
             else:
-
-                if timeInKeyframes >= timesForName[-1]:
-                    continue
-
-                i = 0
-                while timeInKeyframes > timesForName[i]:
-                    i += 1
-
-                i = i - 1
-
-                P_0 = (timesForName[i], keysForName[i][0])
-                P_1 = (timesForName[i] + keysForName[i][2][1], keysForName[i][0] + keysForName[i][2][2])
-                P_2 = (timesForName[i+1], keysForName[i+1][0]) #
-                P_3 = (timesForName[i+1] + keysForName[i+1][1][1], keysForName[i+1][0] + keysForName[i+1][1][2]) 
-
-                t = (timeInKeyframes - timesForName[i]) / (timesForName[i+1] - timesForName[i])
+                t = (timeDiff - timeLow) / (timeHigh - timeLow)
+            
+            if t > 1.:
+                t = 1.
+            elif t < 0.:
+                t = 0.
+            
+            # computing points
+            # special case: first one
+            if (num == 0):
+                p3 = keys[i][num][0]
+                p2 = p3 + keys[i][num][1][2]
+                p0 = 0
+                p1 = 0
+            else:
+                p0 = keys[i][num-1][0]
+                p3 = keys[i][num][0]
+                p1 = p0 + keys[i][num-1][1][2]
+                p2 = p3 + keys[i][num][1][2]
                 
-                
-            if t > 1:
-                t = 1.0
-            elif t < 0:
-                t = 0.0
-
-            target_joints[name] = ((1-t) ** 3) * P_0[1] + 3 * ((1-t) ** 2) * t * P_1[1] + 3 * (1-t) * (t ** 2) * P_2[1] + (t**3) * P_3[1]
-    
-
+            
+            # bezier
+            angle = ((1-t)**3)*p0 + 3*t*((1-t)**2)*p1 + 3*(t**2)*(1-t)*p2 + (t**3)*p3
+            target_joints[name] = angle
+            
         return target_joints
+
 
 
 if __name__ == '__main__':
